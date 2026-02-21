@@ -22,6 +22,7 @@ fi
   SERVICE_PID=$(systemctl show nginx -p MainPID --value)
   FAILURE_MSG="FAILURE Detected: Nginx Services with PID: $SERVICE_PID - State: ($ACTIVE_STATE/$SUB_STATE) - Exit Code: $EXIT_CODE"
   ATTEMPT_MSG="ACTION: Restart Attempted for Nginx SERVICE with PID: $SERVICE_PID"
+  ALERT_LOG="/var/log/nginx_alerts.log"
   
   # STATUS_MSG=$(systemctl show nginx -p StatusText --value)
   
@@ -49,13 +50,48 @@ fi
           local MESSAGE=$1
  	  sudo echo "[$(date '+%Y-%m-%d %H:%M:%S')] $MESSAGE" >> "$LOG_FILE"
   }
+ 
+  # Aler FLag Detection (Designe to avoid auto-spamming alerts)
+  # Define the Alert Function
+  alert_event(){
+  	# Access the first argument ($1)
+	local STATE=$1
+	local RESULT=$2
+
+	# Alert message variable
+	
+	local ALERT_MSG="ALERT: Nginx Failure Detected | ACTION: Restart Attempt | RESULT: $RESULT | STATE: $STATE | TIME: $(date '+%Y-%m-%d %H:%M:%S')"
+
+	# flag_file
+	local FLAG_FILE="/tmp/nginx_alerts.flag"
+
+	# Alerting Logic
+	# If service is still down and we haven't alerted yet:
+	if [[ "$STATE" != "active" && ! -f "$FLAG_FILE" ]]; then
+		# Send Alert Message
+		echo "$ALERT_MSG" >> "$ALERT_LOG"
+		# Create Flag 
+		touch "$FLAG_FILE" # Create the "Alert already exists" flag
+	
+	#If service is fixed and the flag exists (meaning it was broken before):
+	elif [[ "$STATE" == "active" ]]; then
+		echo "RECOVERY: Nginx is back online | TIME: $(date '+%Y-%m-%d %H:%M:%S')" >> "$ALERT_LOG"
+		
+		if [ -f "$FLAG_FILE" ]; then
+		rm "$FLAG_FILE" # Clear the memory so we can alert agin next time it breaks
+		fi 
+	fi
+} 
+
   
-  # Service evaluation 
+
+# Service evaluation 
   if [[ "$ACTIVE_STATE" == "active" ]]; then
           # Print Service is ok. 
           echo "Nginx Service $SERVICE_PID is Healthy."
           exit 0
   else
+
 	# Run the function to verify Log File. 
           log_file_verification
 
@@ -88,15 +124,17 @@ fi
                   echo "Nginx Service Successfully Restart."
                   # Log Successful Restart
                   log_event "$SUCCESS_RESTART_MSG"
-  
+ 		  # Alert Event 
+		  alert_event "$FINAL_STATE" "Successful" 
           else
                   # Print Service Restart Unsuccessful. 
                   echo "Nginx Restart Unsuccessful. Critical Failure detected."
                   log_event "$FAIL_RESTART_MSG"
-  
+		    
+ 		  # Alert Event 
+		  alert_event "$FINAL_STATE" "Failed" 
                   exit 1
           fi
   fi
   
-
 
