@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 
 # Add this at the top of /usr/local/sbin/monitor_nginx_webprod01.sh
 if [[ $EUID -ne 0 ]]; then
