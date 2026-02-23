@@ -33,12 +33,4 @@
 - Ensure correct permissions. 
 - Verify cron execution. 
 
-# Phase 7 - Failure Testing
-- Stop Nginx manually.
-- Observe detection.
-- Confirm restart.
-- Confirm log entry.
-- Confirm alert.
-- Reboot system and retest
-
 
